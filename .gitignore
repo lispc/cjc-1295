@@ -1,0 +1,13 @@
+
+# Security: API keys and credentials
+cc.sh
+.envrc
+.env
+*.key
+
+# Editor autosaves
+#*
+.#*
+*~
+
+workspace/scripts/__pycache__/

@@ -183,5 +183,103 @@
 
 ---
 
-*日志维护者：Kimi Code CLI*
-*最后更新：2026-05-13*
+## 2026-05-14 下午 — 初步 MD 分析与 POSRES/短肽部署
+
+### 当前 MD 状态（4 个模拟同时运行）
+
+| GPU | 模拟 | 进度 | 配置 |
+|-----|------|------|------|
+| 0 | WT MD (无约束) | ~55 ns / 200 ns | dt=0.002, nstlist=10 |
+| 1 | D-Ala2 MD | ~18.3 ns / 200 ns | dt=0.001, nstlist=10 |
+| 2 | WT + POSRES NTERM | ~2.8 ns / 200 ns | GHRH 1-5 CA, 100 kJ |
+| 3 | Short GHRH(1-10) | ~6.3 ns / 200 ns | 无约束, nstlist=40 |
+
+### 催化几何初步分析（所有数据均值）
+
+| 模拟 | Ser630→Ala2C | Tyr1N→Glu205 | Ala2O→Tyr547 |
+|------|-------------|-------------|-------------|
+| 起始 | 2.82 Å ✅ | 2.02 Å ✅ | 3.10 Å ✅ |
+| WT 0-9.4ns | 4.82 Å | 8.96 Å | 4.84 Å |
+| WT 9.4-55ns | **4.41 Å** | 8.86 Å | 4.30 Å |
+| D-Ala2 0-18ns | **6.00 Å** | 8.07 Å | 5.69 Å |
+| POSRES 0-2.8ns | 4.93 Å | 9.99 Å | **3.68 Å** |
+| Short 0-6.3ns | 4.87 Å | **2.76 Å** ✅ | 5.80 Å |
+
+### 关键发现
+
+1. **C 端拖动假说被证实**：短肽保留 N 端盐桥（Tyr1-Glu205 = 2.76 Å），全长 WT 完全丧失（8.86 Å）
+2. **仅锚定不够**：短肽虽固定 N 端，Ser630→Ala2 仍是 4.87 Å — 催化攻击需要特定骨架取向
+3. **CA-only POSRES 太弱**：CA 约束让骨架绕 CA 旋转，C=O 取向不受控。但 Ala2O→Tyr547 氧负离子洞保持在 3.68 Å，说明约束并非完全无效
+4. **WT 稳定在 ~4.4 Å**：不是完全解离，肽在口袋入口处振荡——亚稳态
+5. **D-Ala2 显著更差**：6.00 vs 4.41 Å，与文献预测方向一致
+
+### 性能优化
+
+- GPU 2/3 使用 nstlist=40 + rlist=1.2 + ntmp=8
+- 当前性能：GPU 0/1 ~72-74 ns/day，GPU 2/3 ~50-60 ns/day
+- GPU 0/1 使用 nstlist=10 + ntmp=16，可优化但需重启
+- 短肽 NPT 在 GPU 上遇到 illegal memory access（初始压力 >100 bar），改 CPU dt=0.001 跑通
+
+### POSRES 方案文件
+
+- `topol_nterm.top`：含 `#ifdef POSRES_NTERM` 块
+- `posre_nterm.itp`：GHRH 1-5 CA 原子，力常数 100
+- `md_nterm.mdp`：生产参数，nstlist=40, C-rescale
+- `short_peptide_topol.top`：DPP-IV (chain A) + GHRH 1-10 (chain B)
+
+---
+
+*日志维护者：Claude Code*
+*最后更新：2026-05-14 下午*
+
+---
+
+## 2026-05-14 晚间 — P0a 完成 / P0b 启动 / P1-FEP 筹备
+
+### P0a: 2D Productive Pose Analysis 完成
+
+**定义**: productive pose = d_Ser630-OG→Ala2-C ∈ [2.5, 4.0] Å AND θ_attack = ∠(OG–C–N) ∈ [80°, 120°]
+
+从现有 4 条轨迹提取了攻击角（gmx angle），并与距离数据时间对齐后计算 2D fraction。
+
+| 系统 | 2D Productive | Distance-only | Angle-only | 平均距离 | 平均角度 |
+|------|--------------|---------------|------------|---------|---------|
+| WT GHRH(1-29) | **3.58%** | 21.96% | 60.75% | 4.54±0.25 Å | 82.5±2.4° |
+| D-Ala2 GHRH(1-29) | **0.00%** | 1.10% | 39.56% | 5.99±0.41 Å | **77.7±1.5°** |
+| WT + POSRES | 0.00% | 0.00% | 86.21% | 4.94±0.06 Å | 92.2±2.2° |
+| WT GHRH(1-10) | 0.00% | 0.00% | 76.19% | 4.88±0.04 Å | 83.3±0.2° |
+
+**关键洞察**：
+1. **WT 有 3.58% 的帧处于完全 productive pose，D-Ala2 为 0%** —— D-Ala2 完全无法同时满足距离和角度条件
+2. **D-Ala2 攻击角系统性偏低**（77.7° vs WT 82.5°），说明手性翻转不仅推开距离，还改变了催化取向
+3. **POSRES/短肽角度很好但距离锁定在 ~4.9 Å** —— N 端约束/截断把系统锁死在 productive zone 边缘外
+
+产出文件：
+- `workspace/results/productive_pose_analysis_2d.png`
+- `workspace/results/productive_pose_analysis_2d.txt`
+
+### P0b: Rosetta Constrained Refine 启动
+
+- WT 和 D-Ala2 各 200 models，16 workers 并行
+- CoordinateConstraint on GHRH 1-5 CA, σ=0.5 Å, weight=10.0
+- D-Ala2 prepacking 成功（Rosetta 识别 DAL）
+- 预计完成时间：~40-60 分钟
+
+### GPU 状态
+
+| GPU | 任务 | 状态 |
+|-----|------|------|
+| 0 | WT 全长 200ns MD | 运行中 (~55ns/200ns) |
+| 1 | D-Ala2 全长 200ns MD | 运行中 (~18ns/200ns) |
+| 2 | （已释放，原 POSRES） | 空闲 |
+| 3 | Short GHRH(1-10) MD | 运行中 (~6ns/200ns) |
+
+### 下一步：P1-FEP 筹备
+
+开始调研 GROMACS 2026 中 L-Ala2 → D-Ala2 手性翻转的 alchemical FEP 实现方案。
+目标体系：DPP-IV + GHRH(1-10)（短肽，~100k 原子）。
+
+---
+
+*日志维护者：Claude Code*
+*最后更新：2026-05-14 晚间*

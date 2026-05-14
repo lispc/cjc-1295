@@ -127,7 +127,18 @@
 - **验证**：提取 MD 最后帧，Ser630→Ala2 C 从 2.82 Å 漂到 4.84 Å（WT）/ 6.40 Å（D-Ala2）
 - **教训**：长肽-受体复合物 MD 必须加 N 端约束（POSRES）或 PLUMED，否则 catalytic geometry 无法维持
 
+### Trap 6: CA-only POSRES 不足以维持催化几何
+- **症状**：POSRES on GHRH 1-5 CA (100 kJ/mol/nm²) 跑 2.8 ns，Ser630→Ala2 C = 4.93 Å（起始 2.82 Å）
+- **根因**：CA 约束只固定 Cα 位置，骨架可绕 CA 旋转，C=O 取向不受控
+- **验证**：短肽（无 C 端拖动）Tyr1N→Glu205 保持在 2.76 Å（盐桥完好），但 Ser630→Ala2C 仍 4.87 Å — 说明即使 N 端锚定了，催化攻击距离也不自动满足
+- **修复**：使用全骨架重原子约束（N/CA/C/O, 500-1000 kJ）或 PLUMED 距离约束 `dist(Ser630 OG, Ala2 C) = 3.0 ± 0.3 Å`
+
+### Trap 7: 混合 POSRES + C-rescale/P-R 压力耦合需特殊处理
+- **症状**：grompp 警告 "combining position restraints with pressure coupling can lead to instabilities"
+- **根因**：GROMACS 2026 要求使用 `-r` 指定参考坐标、使用 C-rescale（非 P-R）、加 `refcoord_scaling = com`
+- **修复**：grompp 加 `-r ref.gro`，mdp 用 `pcoupl = C-rescale`
+
 ---
 
-*维护者：Kimi Code CLI*
-*最后更新：2026-05-14*
+*维护者：Claude Code*
+*最后更新：2026-05-14 下午*

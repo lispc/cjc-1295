@@ -147,6 +147,27 @@
 
 **4\. 结合能打分与机理验证** 计算最终模型的界面结合能。如果在引入了大量C端空间位阻惩罚的情况下，FlexPepDock依旧能找到让CJC-1295的N端极稳定地插入GHRHR跨膜核心、且打分极优的结合姿态，那么这项计算机辅助工作便成功地在硅基环境（in silico）中再现了CJC-1295惊艳的药效学设计逻辑。
 
+## **复现管线总体进度（2026-05-14）**
+
+| 阶段 | 任务 | 状态 | 交付物 | GPU/资源 |
+|------|------|------|--------|----------|
+| **P0a** | 结构准备：DPP-IV、GHRH(1-29)、D-Ala2 突变体 | ✅ 完成 | `DPP4_clean.pdb`, `GHRH_1-29.pdb`, `GHRH_1-29_DAla2.pdb` | — |
+| **P0b** | Rosetta FlexPepDock + Constrained Refine | ✅ 完成 | `refine_constrained_WT_combined.silent` (201 models), `refine_constrained_DAla2_combined.silent` (201 models) | CPU |
+| **P0c** | MD 体系构建：溶剂化、离子化、能量最小化、NVT/NPT 平衡 | ✅ 完成 | `md.tpr`, `DAla2_production.tpr`, `short_peptide_md.tpr` | — |
+| **P1** | **FEP 自由能微扰**：L-Ala2 ↔ D-Ala2 双拓扑 11 λ 窗口 | ⏳ **运行中** | 11 个 `lambda_*/fep.xtc`（各 5 ns） | GPU 2 |
+| **P2a** | WT 200 ns 生产 MD | ⏳ **运行中**（66.9 ns / 200 ns，已澄清 GPU 正常） | `md.xtc` | GPU 0 |
+| **P2b** | D-Ala2 200 ns 生产 MD | ⏳ **运行中** | `DAla2_md.xtc` (22 ns / 200 ns) | GPU 1 |
+| **P2c** | Short Peptide WT 200 ns MD | ⏳ **运行中** | `short_peptide_md.xtc` (28.1 ns / 200 ns) | GPU 3 |
+| **P3** | 数据分析：RMSF、SASA、催化几何、MM-PBSA、FEP ΔG | ⏳ **等待中** | 图表 + 定量对比表 | — |
+
+**当前计算资源占用**：
+- GPU 0: WT MD（93% util, 434 MiB）
+- GPU 1: D-Ala2 MD（52% util, 434 MiB）
+- GPU 2: FEP λ₀₀-λ₀₂（99% util, 1010 MiB，3 窗口并发）
+- GPU 3: Short Peptide MD（39% util, 330 MiB）
+
+---
+
 ## **本地复现已知问题与修复记录**
 
 在本地复现过程中，我们发现了以下结构性 pipeline bug，已修复并记录如下：
@@ -197,7 +218,32 @@
 - 或改用 PLUMED 反应坐标约束
 - 当前 MD 继续运行，后续分析关注**相对漂移速率**（WT vs D-Ala2）
 
-### Issue 4: API 密钥泄露（Security）
+### Issue 4: WT MD 进程误判与不必要的重启（已澄清，2026-05-14）
+
+**根因**：检查了旧的 `md.log`（part0001，仅到 9.44 ns），未注意到 `-noappend` 已创建 `md.part0002.log`。
+`md.part0002.log` 显示该进程已正常跑到 66.92 ns，性能 74.141 ns/day。
+
+**教训**：
+- GROMACS 2026 默认自动启用 GPU 加速，`-gpu_id` 已足以触发
+- 使用 `-noappend` 时，必须检查最新的 `*.part*.log`
+- 重启前务必确认实际进度
+- **WT MD 已重启继续运行，数据无损失**
+
+### Issue 5: FEP 双拓扑构建中的一系列拓扑同步问题（已解决）
+
+**根因**：GROMACS 双拓扑 FEP 对 atomtypes 定义顺序、GRO 原子数连续性、
+虚拟原子坐标位置、二面角 multiplicity 匹配有严格要求。
+
+**遇到的问题链**：
+1. `Atomtype DU not found` → `[ atomtypes ] DU` 必须在第一个 `[ moleculetype ]` 之前定义
+2. 缺少 DU 键合参数 → 在 TOP 中显式添加零力 `[ bondtypes ]`、`[ angletypes ]`、`[ dihedraltypes ]`
+3. GRO 原子数不匹配 → D-原子必须插入蛋白和溶剂之间，保持连续编号
+4. `perturbed excluded non-bonded pair beyond cut-off` → D-原子坐标必须紧邻 L-对应原子（~0.15 nm），而非远距离镜像
+5. `Cannot perturb torsion with multiple terms` → DU 涉及的二面角必须用匹配的 function type 和 multiplicity
+
+**修复状态**：全部修复，100-step 测试通过，11 窗口生产运行已启动。
+
+### Issue 6: API 密钥泄露（Security）
 
 **根因**：早期脚本 `cc.sh` 中包含明文 API key。
 

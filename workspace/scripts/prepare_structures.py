@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 """
-Phase 1 Structure Preparation Script
+DEPRECATED — Use prepare_structures_v2.py instead.
+
+This version incorrectly keeps chain A of 1NU8 (Diprotin A binds to chain B).
+See AGENTS.md Trap #3 for the chain issue.
+
+Phase 1 Structure Preparation Script (v1 — deprecated)
 - Preprocess 1NU8 (DPP-IV) -> DPP4_clean.pdb
 - Extract GHRH(1-29) from 7CZ5 or 7V9M -> GHRH_1-29.pdb
 - Build YAD tripeptide -> YAD_tripeptide.pdb
 """
+
+import warnings
+warnings.warn("prepare_structures.py is deprecated. Use prepare_structures_v2.py instead. "
+              "This version keeps chain A, but Diprotin A binds to chain B.", DeprecationWarning)
 
 import os
 import sys

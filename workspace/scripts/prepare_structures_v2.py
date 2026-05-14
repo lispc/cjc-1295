@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Phase 1 Structure Preparation Script (v2)
+Phase 1 Structure Preparation Script (CURRENT — use this one)
 - Preprocess 1NU8 (DPP-IV) -> DPP4_clean.pdb
   IMPORTANT: Diprotin A (chain D) binds to chain B, not chain A!
   We keep chain B as the receptor.
 - Extract GHRH(1-29) from 7CZ5 -> GHRH_1-29.pdb
 - Build YAD tripeptide -> YAD_tripeptide.pdb
+
+NOTE: prepare_structures.py (v1) is DEPRECATED. It keeps chain A, which is wrong.
+      This v2 is the correct version. Always use v2 for new runs.
 """
 
 import os, sys

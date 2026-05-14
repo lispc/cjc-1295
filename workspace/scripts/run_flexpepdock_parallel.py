@@ -20,6 +20,10 @@ MODELS_PER_WORKER = 60
 THREADS_PER_WORKER = 8
 BASE_SEED = 1542402926  # same base as original run
 
+# CRITICAL: Always pass -native so RMS columns are meaningful.
+# Without -native, startRMSall = 0 for all models (self-reference).
+NATIVE_PDB = INPUT_PDB  # Use input as native reference for refine-only
+
 def run_worker(args):
     worker_id, nstruct, seed = args
     silent_out = f"{STEP2}/GHRH_DPP4_dock_worker_{worker_id:02d}.silent"
@@ -29,6 +33,7 @@ def run_worker(args):
         f"{ROSETTA_BIN}/FlexPepDocking",
         f"-database", DB,
         f"-s", INPUT_PDB,
+        f"-native", NATIVE_PDB,   # ← FIXED: was missing, causing RMS self-reference
         f"-lowres_preoptimize",
         f"-pep_refine",
         f"-ex1", f"-ex2aro",

@@ -90,12 +90,22 @@ print("Step 0: Build YAD tripeptide")
 print("=" * 60)
 
 cmd.reinitialize()
-cmd.fab("YAD", "YAD", ss=0)
+# CRITICAL FIX: Do NOT use cmd.fab("YAD", ss=0) which builds a linear
+# peptide with phi=psi=0 (Ramachandran forbidden). Instead, extract
+# the natural YAD conformation from the GHRH crystal structure (7CZ5).
+# This preserves native backbone geometry (phi~96, psi~40 for Ala2)
+# and prevents pair_fit() in prepare_docking_start.py from flattening
+# the GHRH backbone.
+cmd.load(f"{STEP1}/GHRH_1-29_from_7CZ5.pdb", "GHRH_ref")
+cmd.create("YAD", "GHRH_ref and resi 1-3")
+cmd.delete("GHRH_ref")
 
 # Ensure protonation state: N-terminus NH3+, C-terminus COO-
-# PyMOL fab should do this by default, but let's verify
+# (the extracted YAD already has proper protonation from PDB)
 cmd.save(f"{STEP0}/YAD_tripeptide.pdb", "YAD")
 print(f"  Saved: {STEP0}/YAD_tripeptide.pdb")
+print("  NOTE: YAD extracted from native GHRH(1-29) crystal structure")
+print("        (avoids linear fab() artifact with phi=psi=0)")
 
 # Also save a version aligned to Diprotin A in 1NU8 for quick validation
 cmd.reinitialize()

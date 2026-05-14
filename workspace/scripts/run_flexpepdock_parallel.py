@@ -62,8 +62,10 @@ def combine_results():
 
     cmd = [
         f"{ROSETTA_BIN}/combine_silent",
-        "-out", f"{STEP2}/GHRH_DPP4_dock_combined.silent",
-    ] + [f"{STEP2}/{f}" for f in silent_files]
+        "-out:file:silent", f"{STEP2}/GHRH_DPP4_dock_combined.silent",
+    ]
+    for f in silent_files:
+        cmd += ["-in:file:silent", f"{STEP2}/{f}"]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode == 0:

@@ -60,13 +60,25 @@
 **目的**：在完整长肽模拟之前，先用最小的功能片段（N 端三肽）快速验证 Ala2 与 DPP-IV 活性口袋的契合逻辑，半小时内获得定性图像证据。
 
 #### 0.1 三肽结构构建
+
+> **⚠️ CRITICAL BUG FIX (2026-05-14)**
+> 
+> `cmd.fab("YAD", ss=0)` builds a **linear peptide** with φ≈0°, ψ≈0° (Ramachandran
+> forbidden region). When used as a `pair_fit()` reference in Step 2, it
+> **flattens the GHRH backbone** and creates an unphysical starting conformation
+> that causes GROMACS integration failures.
+>
+> **FIX**: Extract the natural YAD conformation from the GHRH crystal structure
+> (7CZ5) instead of building it with `fab()`. See `prepare_structures.py`.
+
 ```python
-# PyMOL 脚本：构建 Tyr-Ala-Asp 三肽
-from chempy import peptidereader
-# 或使用 Builder 工具
+# ❌ OLD (buggy): builds linear peptide with phi=psi=0
 cmd.fab("YAD", "tripeptide", ss=0)
+
+# ✅ NEW (fixed): extract native YAD from GHRH crystal structure
+cmd.load("GHRH_1-29_from_7CZ5.pdb", "GHRH_ref")
+cmd.create("YAD", "GHRH_ref and resi 1-3")
 cmd.save("YAD_tripeptide.pdb")
-# 确保 N 端为 NH3+，C 端为 COO-
 ```
 或使用 **RDKit/PEP-FOLD** 生成标准三肽 PDB。
 
@@ -450,7 +462,59 @@ gmx sasa -s md.tpr -f md.xtc -n index.ndx -o sasa_Ala2.xvg \
 
 ---
 
-## 8. 风险评估与备选方案
+## 8. 已知问题与修复记录 (Known Issues & Fixes)
+
+### Bug #1: `cmd.fab("YAD", ss=0)` 压平 GHRH backbone（已修复）
+
+**发现时间**：2026-05-13
+
+**症状**：
+- D-Ala2 突变体 MD 生产运行启动后立即 segfault / LINCS 警告 / NaN
+- 起始结构 phi=-6°, psi=-3°（Ramachandran 禁区）
+- dt=0.002 时无法稳定，必须降到 dt=0.001
+
+**根因分析**：
+```
+cmd.fab("YAD", "YAD", ss=0)   → 线性肽 (phi=0, psi=0)
+      ↓
+cmd.align(YAD → Diprotin A)   → 线性肽对齐到活性位点
+      ↓
+cmd.pair_fit(GHRH → YAD_ref)  → GHRH backbone 被强制压平
+```
+PyMOL `fab()` with `ss=0` generates a fully linear/extended peptide where
+all backbone dihedrals are ~0°. `pair_fit()` then forces GHRH's N-terminal
+backbone to match this linear reference, distorting the natural conformation.
+
+**修复方案**：
+1. `prepare_structures.py` / `prepare_structures_v2.py`：
+   - 去掉 `cmd.fab("YAD", ss=0)`
+   - 从 `GHRH_1-29_from_7CZ5.pdb` 提取天然 YAD 构象
+2. `prepare_docking_start.py`：
+   - 增加 phi/psi/omega 验证脚本
+   - 如果检测到 phi~0, psi~0，发出 WARNING
+
+**当前状态**：
+- WT MD：~40 ns / 200 ns，GPU 0，稳定运行
+- D-Ala2 MD：~12.9 ns / 200 ns，GPU 1，dt=0.001
+  - 前 ~12 ns 为弛豫期：从 phi=-6° 弛豫到 phi=-106°（beta-sheet 区域）
+  - 12 ns 后系统物理有效，温度/压力稳定
+  - **决定：继续当前生产运行，不重启**（系统已自我纠正）
+
+### Bug #2: Rosetta refine-only 降低催化几何质量（已记录）
+
+**发现时间**：2026-05-13
+
+**症状**：
+- `FlexPepDocking -pep_refine` 后的 I_sc 更好，但 Ser630→Ala2 C=O 距离从 2.82 Å 增加到 3.5+ Å
+- 说明 refine 没有催化约束，单纯优化能量会偏离催化准备态
+
+**应对措施**：
+- 使用 refine 结果时，额外过滤催化几何指标
+- 或改用带约束的 Rosetta 协议（如 enzdes constraint file）
+
+---
+
+## 9. 风险评估与备选方案
 
 | 风险 | 可能性 | 应对措施 |
 |------|--------|----------|
@@ -462,19 +526,23 @@ gmx sasa -s md.tpr -f md.xtc -n index.ndx -o sasa_Ala2.xvg \
 
 ---
 
-## 9. 下一步行动计划
+## 10. 下一步行动计划
 
 | 步骤 | 任务 | 预估时间 | 交付物 |
 |------|------|----------|--------|
 | **1** | 环境检查：确认 GROMACS、APBS、AmberTools 安装；测试 Rosetta FlexPepDock 能否正常运行 | 2–4 小时 | 环境就绪确认 |
-| **2** | **Step 0 快速验证**：构建 YAD 三肽，手动叠合到 1NU8，运行 PyMOL 静电势可视化 | 1–2 小时 | 静电势互补定性图 |
+| **2** | **Step 0 快速验证**：构建 YAD 三肽（**使用修复后的天然提取法**），手动叠合到 1NU8，运行 PyMOL 静电势可视化 | 1–2 小时 | 静电势互补定性图 |
 | **3** | 结构准备：下载 1NU8/7CZ5，预处理 DPP-IV，提取/构建 GHRH(1-29) | 2–3 小时 | `DPP4_clean.pdb`, `GHRH_1-29.pdb` |
 | **4** | Rosetta 对接：生成片段库，运行 FlexPepDock（1000 models），筛选最优模型 | 1 天 | 对接姿态聚类结果 |
 | **5** | 小规模 MD 验证：最优模型运行 10 ns 测试，检查稳定性 | 2–3 小时 | 测试轨迹 |
 | **6** | 生产模拟：正式运行 200 ns MD + D-Ala2 对照 200 ns | 2–3 天 | `md.xtc`, `md.tpr` |
 | **7** | 数据分析与可视化：距离/角度/RMSF/SASA/静电势/MM-PBSA | 1 天 | 图表 + 复现报告 |
 
+> **当前进度（2026-05-14）**：
+> - WT MD：~40 ns / 200 ns ✅ 稳定
+> - D-Ala2 MD：~12.9 ns / 200 ns ✅ 稳定（初始弛豫期已过）
+
 ---
 
-*方案版本：v1.1（已根据用户反馈更新：RTX 3090 / 200ns / Rosetta / Step 0 快速验证）*
-*更新日期：2026-05-13*
+*方案版本：v1.2（已修复：YAD tripeptide `fab()` backbone flattening bug；添加 phi/psi 验证）*
+*更新日期：2026-05-14*

@@ -147,6 +147,47 @@
 
 **4\. 结合能打分与机理验证** 计算最终模型的界面结合能。如果在引入了大量C端空间位阻惩罚的情况下，FlexPepDock依旧能找到让CJC-1295的N端极稳定地插入GHRHR跨膜核心、且打分极优的结合姿态，那么这项计算机辅助工作便成功地在硅基环境（in silico）中再现了CJC-1295惊艳的药效学设计逻辑。
 
+## **本地复现已知问题与修复记录**
+
+在本地复现过程中，我们发现了以下结构性 pipeline bug，已修复并记录如下：
+
+### Issue 1: PyMOL `cmd.fab("YAD", ss=0)` 压平 backbone（Critical）
+
+**根因**：`cmd.fab()` with `ss=0` 生成完全线性的肽链，所有 backbone dihedrals ≈0°（Ramachandran 禁区）。当 `prepare_docking_start.py` 用 `pair_fit()` 将 GHRH N-端对齐到这个线性参考时，GHRH 的 backbone 被强制压平，产生不物理的起始构象。
+
+**后果**：
+- D-Ala2 突变体起始结构 phi=-6°, psi=-3°（禁区）
+- GROMACS 生产运行 dt=0.002 时立即 segfault
+- 必须降到 dt=0.001 才能缓慢弛豫
+
+**修复**：
+1. `prepare_structures.py` / `prepare_structures_v2.py`：
+   - 去掉 `cmd.fab("YAD", ss=0)`
+   - 改为从 `GHRH_1-29_from_7CZ5.pdb` 提取天然 YAD 构象
+2. `prepare_docking_start.py`：
+   - 增加 phi/psi/omega 自动验证
+   - 检测到 phi~0, psi~0 时发出 WARNING
+
+**当前状态**：
+- 已修复代码（v1.2）
+- 现有 MD 不需要重启（D-Ala2 已在前 12 ns 自我纠正到 beta-sheet 区域）
+
+### Issue 2: Rosetta refine-only 降低催化几何质量
+
+**根因**：Rosetta `FlexPepDocking -pep_refine` 没有催化几何约束，单纯优化能量会导致催化位点偏离理想几何。
+
+**后果**：I_sc 与催化能力呈反相关（高分模型反而催化几何更差）。
+
+**修复建议**：使用 refine 结果时，额外用 `validate_docked_pose.py` 过滤催化几何指标；或改用带约束的 enzdes 协议。
+
+### Issue 3: API 密钥泄露（Security）
+
+**根因**：早期脚本 `cc.sh` 中包含明文 API key。
+
+**修复**：已从仓库中删除该文件，但仍需轮换密钥。
+
+---
+
 ## **结语**
 
 CJC-1295（DAC:GRF）的研发不仅是内分泌药理学的一次突破，更是早期计算生物学与药物辅助设计在复杂多肽修饰领域中的标杆案例。其成功绝非偶然的试错，而是建立在对靶点结构、酶动力学与微观物理化学性质深刻计算洞察的基础上。

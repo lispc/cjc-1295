@@ -91,10 +91,17 @@ print("Step 0: Build YAD tripeptide")
 print("=" * 60)
 
 cmd.reinitialize()
-cmd.fab("YAD", "YAD", ss=0)
+# CRITICAL FIX: Do NOT use cmd.fab("YAD", ss=0) which builds a linear
+# peptide with phi=psi=0 (Ramachandran forbidden). Instead, extract
+# the natural YAD conformation from the GHRH crystal structure (7CZ5).
+cmd.load(f"{STEP1}/GHRH_1-29_from_7CZ5.pdb", "GHRH_ref")
+cmd.create("YAD", "GHRH_ref and resi 1-3")
+cmd.delete("GHRH_ref")
 cmd.alter("YAD", "chain='Y'")
 cmd.sort()
 cmd.save(f"{STEP0}/YAD_tripeptide.pdb", "YAD")
 print(f"  Saved: {STEP0}/YAD_tripeptide.pdb")
+print("  NOTE: YAD extracted from native GHRH(1-29) crystal structure")
+print("        (avoids linear fab() artifact with phi=psi=0)")
 
 cmd.quit()

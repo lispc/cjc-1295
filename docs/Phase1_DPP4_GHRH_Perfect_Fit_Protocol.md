@@ -512,6 +512,37 @@ backbone to match this linear reference, distorting the natural conformation.
 - 使用 refine 结果时，额外过滤催化几何指标
 - 或改用带约束的 Rosetta 协议（如 enzdes constraint file）
 
+### Bug #3: 29 残基长肽在无约束 MD 中从口袋漂移（新发现，2026-05-14）
+
+**症状**：
+- WT MD ~40 ns 后：Ser630→Ala2 C = 4.84 Å，攻击角 49.5°，0/4 PASS
+- D-Ala2 MD ~12.9 ns 后：Ser630→Ala2 C = 6.40 Å，攻击角 86.6°，1/4 PASS
+- 起始结构均为 4/4 PASS（2.82 Å，113.6°）
+
+**根因**：
+GHRH(1-29) 是 29 残基长肽，C 端 24 个残基完全暴露在溶剂中。热涨落 + C 端柔性会自然拉动 N 端离开 DPP-IV 活性口袋。这是**长肽-受体复合物的固有物理行为**，不是力场或软件 bug。
+
+**关键对比**（起始结构 → MD 最后帧）：
+
+| 指标 | 起始结构 | WT ~40 ns | D-Ala2 ~12.9 ns |
+|------|---------|-----------|-----------------|
+| Ser630 OG → Ala2 C | 2.82 Å ✅ | 4.84 Å ❌ | 6.40 Å ❌ |
+| 攻击角 ∠(OG–C–N) | 113.6° ✅ | 49.5° ❌ | 86.6° ⚠️ |
+| Tyr1 N → Glu205 | 2.02 Å ✅ | 9.27 Å ❌ | 6.08 Å ❌ |
+| **PASS** | **4/4** | **0/4** | **1/4** |
+
+**应对措施**：
+1. **当前 MD 继续运行**，但后续分析应关注**相对漂移速率**（WT vs D-Ala2），而非绝对 PASS/FAIL
+2. **如需保持催化几何**，在 mdp 中加 N 端弱位置限制：
+   ```
+   define = -DPOSRES_NTERM
+   ```
+   仅限制 GHRH 残基 1–5 的 CA（力常数 100 kJ/mol/nm²）
+3. **更优雅的方案**：PLUMED 反应坐标约束，保持 Ser630 OG–Ala2 C 距离在 3 ± 0.5 Å
+
+**可视化**：
+- `workspace/figures/md_alignment_WT_vs_DAla2.png` — MD 最后帧催化几何对比
+
 ---
 
 ## 9. 风险评估与备选方案

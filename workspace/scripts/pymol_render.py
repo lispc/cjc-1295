@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PyMOL rendering: D-Ala2 vs L-Ala2 catalytic geometry at DPP-IV active site."""
+"""PyMOL: D-Ala2 vs L-Ala2 at DPP-IV active site — clean, no solvent."""
 import sys, os
 os.chdir("/home/scroll/personal/cjc-1295/workspace/step3")
 sys.path.insert(0, "/home/scroll/miniforge3/lib/python3.13/site-packages")
@@ -15,100 +15,121 @@ cmd.set("antialias", 2)
 cmd.set("cartoon_fancy_helices", 1)
 cmd.set("depth_cue", 0)
 cmd.set("ray_opaque_background", 0)
+cmd.set("cartoon_loop_radius", 0.3)
+cmd.set("cartoon_oval_length", 1.8)
+cmd.set("cartoon_rect_length", 1.8)
 
 # Custom colors
-cmd.set_color("dppiv_grey",  [0.72, 0.72, 0.75])
-cmd.set_color("catalytic_c", [0.90, 0.45, 0.20])
-cmd.set_color("oxyanion_c",  [0.18, 0.65, 0.55])
-cmd.set_color("d_ala_c",     [0.90, 0.25, 0.30])
-cmd.set_color("l_ala_c",     [0.28, 0.47, 0.62])
+cmd.set_color("dppiv_grey",  [0.68, 0.68, 0.72])
+cmd.set_color("catalytic_c", [1.00, 0.50, 0.20])
+cmd.set_color("oxyanion_c",  [0.15, 0.65, 0.55])
+cmd.set_color("d_ala_c",     [0.90, 0.22, 0.28])
+cmd.set_color("l_ala_c",     [0.22, 0.45, 0.62])
 cmd.set_color("anchor_c",    [0.85, 0.30, 0.30])
+cmd.set_color("pocket_c",    [0.90, 0.88, 0.70])
 
-# ── Load structures ──
-cmd.load("frame_DALA_100ns.pdb", "DALA")
-cmd.load("frame_LALA_25ns.pdb",  "LALA")
+# ── Load structures (merged topology: DPP-IV=resi 39-766, GHRH=resi 1-29) ──
+cmd.load("frame_DALA_clean.pdb", "DALA")
+cmd.load("frame_LALA_clean.pdb",  "LALA")
 
-# Load starting structure as a 3rd reference
-# cmd.load("frame_start.pdb", "start")
+# ── Selection helpers ──
+DPPIV_SEL = "resi 39-766"
+GHRH_SEL  = "resi 1-29"
+CATALYTIC = "resi 630+708+740"
+OXYANION  = "resi 547+631"
+ANCHOR    = "resi 205+206"
+ALA2_CB   = "resi 2 and name CB"
+SER630_OG = "resi 630 and name OG"
+ALA2_C    = "resi 2 and name C"
+ALA2_N    = "resi 2 and name N"
 
-# ─────────────────────────────────────────────────────────
-def setup_scene(obj_name, peptide_color, label_text):
-    """Apply common styling to the complex."""
+def setup_scene(obj, pep_color):
     cmd.disable("all")
-    cmd.enable(obj_name)
+    cmd.enable(obj)
 
-    # DPP-IV: light cartoon
-    cmd.show("cartoon", f"{obj_name} and chain A")
-    cmd.color("dppiv_grey", f"{obj_name} and chain A")
-    cmd.set("cartoon_transparency", 0.60, f"{obj_name} and chain A")
+    # ── DPP-IV cartoon ──
+    cmd.show("cartoon", f"{obj} and {DPPIV_SEL}")
+    cmd.color("dppiv_grey", f"{obj} and {DPPIV_SEL}")
+    cmd.set("cartoon_transparency", 0.50, f"{obj}")
 
-    # Catalytic triad Ser630, Asp708, His740
-    cmd.show("sticks", f"{obj_name} and chain A and resi 630+708+740")
-    cmd.color("catalytic_c", f"{obj_name} and chain A and resi 630+708+740")
+    # ── Active site pocket surface (transparent) ──
+    cmd.select("pocket_sel", f"{obj} and {DPPIV_SEL} and byres ({CATALYTIC} around 8)")
+    cmd.show("surface", "pocket_sel")
+    cmd.color("pocket_c", "pocket_sel")
+    cmd.set("surface_quality", 1)
+    cmd.set("transparency", 0.55, "pocket_sel")
 
-    # Oxyanion hole: Tyr547, Ser631
-    cmd.show("sticks", f"{obj_name} and chain A and resi 547+631")
-    cmd.color("oxyanion_c", f"{obj_name} and chain A and resi 547+631")
+    # ── Catalytic triad (Ser630, Asp708, His740): orange sticks ──
+    cmd.show("sticks", f"{obj} and {CATALYTIC}")
+    cmd.color("catalytic_c", f"{obj} and {CATALYTIC}")
+    cmd.set("stick_radius", 0.22, f"{obj} and {CATALYTIC}")
 
-    # Glu205/206 anchor
-    cmd.show("sticks", f"{obj_name} and chain A and resi 205+206")
-    cmd.color("anchor_c", f"{obj_name} and chain A and resi 205+206")
+    # ── Oxyanion hole (Tyr547, Ser631): teal sticks ──
+    cmd.show("sticks", f"{obj} and {OXYANION}")
+    cmd.color("oxyanion_c", f"{obj} and {OXYANION}")
 
-    # GHRH N-terminal peptide (resi 1-5): thick sticks
-    cmd.show("sticks", f"{obj_name} and chain B and resi 1-5")
-    cmd.color(peptide_color, f"{obj_name} and chain B and resi 1-5")
-    cmd.set("stick_radius", 0.25, f"{obj_name} and chain B")
+    # ── Glu205/206 anchor: red sticks ──
+    cmd.show("sticks", f"{obj} and {ANCHOR}")
+    cmd.color("anchor_c", f"{obj} and {ANCHOR}")
 
-    # Highlight Ala2 CB (sidechain)
-    cmd.show("spheres", f"{obj_name} and chain B and resi 2 and name CB")
-    cmd.color(peptide_color, f"{obj_name} and chain B and resi 2 and name CB")
-    cmd.set("sphere_scale", 0.45, f"{obj_name} and chain B and resi 2 and name CB")
+    # ── GHRH N-terminus (resi 1-5): thick sticks ──
+    cmd.show("sticks", f"{obj} and {GHRH_SEL} and resi 1-5")
+    cmd.color(pep_color, f"{obj} and {GHRH_SEL} and resi 1-5")
+    cmd.set("stick_radius", 0.28, f"{obj} and {GHRH_SEL}")
 
-    # Distance: Ser630 OG → Ala2 C
-    cmd.distance(f"{obj_name}_dist",
-                 f"{obj_name} and chain A and resi 630 and name OG",
-                 f"{obj_name} and chain B and resi 2 and name C")
-    cmd.color(peptide_color, f"{obj_name}_dist")
-    cmd.set("dash_length", 0.15, f"{obj_name}_dist")
-    cmd.set("dash_gap", 0.10, f"{obj_name}_dist")
+    # ── GHRH rest (resi 6-29): thin cartoon ──
+    cmd.show("cartoon", f"{obj} and {GHRH_SEL} and resi 6-29")
+    cmd.color(pep_color, f"{obj} and {GHRH_SEL} and resi 6-29")
+    cmd.set("cartoon_transparency", 0.30, f"{obj} and {GHRH_SEL}")
 
-    # Angle: OG – C – N
-    cmd.angle(f"{obj_name}_ang",
-              f"{obj_name} and chain A and resi 630 and name OG",
-              f"{obj_name} and chain B and resi 2 and name C",
-              f"{obj_name} and chain B and resi 2 and name N")
-    cmd.color(peptide_color, f"{obj_name}_ang")
+    # ── Ala2 CB sphere ──
+    cmd.show("spheres", f"{obj} and {ALA2_CB}")
+    cmd.color(pep_color, f"{obj} and {ALA2_CB}")
+    cmd.set("sphere_scale", 0.50, f"{obj} and {ALA2_CB}")
 
-    # Labels
-    cmd.set("label_size", 24)
+    # ── Distance: Ser630 OG → Ala2 C ──
+    cmd.distance(f"{obj}_d", f"{obj} and {SER630_OG}", f"{obj} and {ALA2_C}")
+    cmd.color(pep_color, f"{obj}_d")
+    cmd.set("dash_length", 0.12, f"{obj}_d")
+    cmd.set("dash_gap", 0.08, f"{obj}_d")
+    cmd.set("dash_radius", 0.08, f"{obj}_d")
+
+    # ── Angle: OG – C – N ──
+    cmd.angle(f"{obj}_a", f"{obj} and {SER630_OG}",
+              f"{obj} and {ALA2_C}", f"{obj} and {ALA2_N}")
+    cmd.color(pep_color, f"{obj}_a")
+
+    # ── Labels ──
+    cmd.set("label_size", 26)
     cmd.set("label_font_id", 5)
     cmd.set("label_outline_color", "white")
+    cmd.set("label_color", pep_color)
 
-    # Zoom on active site
-    cmd.zoom(f"{obj_name} and chain A and resi 630", 10)
+    # ── Zoom on active site ──
+    cmd.zoom(f"{obj} and {CATALYTIC}", 13)
 
-    # Title label
-    cmd.pseudoatom(f"{obj_name}_title", pos=[0, 0, 0])
-    # Will be positioned after zoom
+    # ── Clean up temporary selection ──
+    cmd.delete("pocket_sel")
 
 
-# ── Render D-Ala2 panel ──
-setup_scene("DALA", "d_ala_c", "D-Ala2 (CJC-1295)")
-# Reposition
-cmd.turn("y", -20)
-cmd.turn("x", 15)
-cmd.move("z", 2)
-cmd.ray(1600, 900)
-cmd.png("panel_DALA.png", width=1600, height=900, dpi=300)
-print("Panel DALA rendered")
+# ── Render D-Ala2 ──
+setup_scene("DALA", "d_ala_c")
+cmd.turn("y", -25)
+cmd.turn("x", 10)
+cmd.move("z", 3)
+cmd.move("y", -1)
+cmd.ray(1600, 1000)
+cmd.png("panel_DALA.png", width=1600, height=1000, dpi=300)
+print("Panel DALA done")
 
-# ── Render L-Ala2 panel ──
-setup_scene("LALA", "l_ala_c", "L-Ala2 (native GHRH)")
-cmd.turn("y", -20)
-cmd.turn("x", 15)
-cmd.move("z", 2)
-cmd.ray(1600, 900)
-cmd.png("panel_LALA.png", width=1600, height=900, dpi=300)
-print("Panel LALA rendered")
+# ── Render L-Ala2 ──
+setup_scene("LALA", "l_ala_c")
+cmd.turn("y", -25)
+cmd.turn("x", 10)
+cmd.move("z", 3)
+cmd.move("y", -1)
+cmd.ray(1600, 1000)
+cmd.png("panel_LALA.png", width=1600, height=1000, dpi=300)
+print("Panel LALA done")
 
-print("Done — panel_DALA.png and panel_LALA.png")
+print("Done.")

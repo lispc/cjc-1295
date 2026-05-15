@@ -120,7 +120,20 @@ workspace/
 - `*_start.pdb`：Rosetta 对接/模拟的起始构象
 - `*_prepack.pdb` / `*_prepack.silent`：Rosetta 预打包输出
 
+### `step3/` — MD 配置（更新 2026-05-15）
+
+| 文件 | 说明 |
+|------|------|
+| `md.tpr` / `md*.trr` | **CJC-1295 (D-Ala2, 1-29)**, 130+ ns |
+| `DAla2_production.tpr` / `DAla2_md.xtc` | **天然 GHRH (L-Ala, 1-29)**, dt=0.002 重启 |
+| `short_peptide_md.*` | **D-Ala2 短肽 (1-10)**, 143+ ns |
+| `short_peptide_LAla_md.*` | **L-Ala 短肽 (1-10)**, 新启动 |
+| `lambda_00/` – `lambda_10/` | **FEP (D-Ala2 ↔ L-Ala2)**, 11 windows × 5 ns |
+| `bar_output.txt` / `fep_summary.xvg` | FEP BAR 分析结果 |
+
+重要：所有旧文件中 "wt"/"dala2" 标签与实际手性互换，详见 `CHIRALITY_LABELS.txt`。
+
 ---
 
-*维护者：Kimi Code CLI*
-*最后更新：2026-05-13*
+*维护者：Claude Code*
+*最后更新：2026-05-15 下午*

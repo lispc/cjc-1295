@@ -11,3 +11,32 @@ cc.sh
 *~
 
 workspace/scripts/__pycache__/
+
+# MD simulation data (large binaries)
+*.trr
+*.tpr
+*.cpt
+*.edr
+*.xtc
+*.gro
+*.log
+*.xvg
+*.itp
+*.top
+*.mdp
+
+# Large workspace directories
+workspace/step0/
+workspace/step1/
+workspace/step2/
+workspace/step3/
+workspace/results/
+workspace/figures/
+
+# Temporary/editor files
+#*
+*~
+*.swp
+
+# Crash logs
+ROSETTA_CRASH.log

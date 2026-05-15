@@ -138,7 +138,19 @@
 - **根因**：GROMACS 2026 要求使用 `-r` 指定参考坐标、使用 C-rescale（非 P-R）、加 `refcoord_scaling = com`
 - **修复**：grompp 加 `-r ref.gro`，mdp 用 `pcoupl = C-rescale`
 
+### Trap 8: D/L-氨基酸手性标签容易混淆
+- **症状**：项目中所有 WT/D-Ala2 标签与实际手性完全相反，跑了一周才发现
+- **根因**：`build_DAla_mutant.py` 的镜像翻转逻辑写反；7CZ5 模板本身已是 D-Ala2，翻转后生成 L-Ala 但标签写 D-Ala2
+- **检测**：检查 Ala2 的 N-CA-CB-C 二面角符号：χ > 0 → L-Ala，χ < 0 → D-Ala
+- **教训**：任何手性操作后必须验证 χ 二面角符号，不能信任标签。详见 `docs/CHIRALITY_CORRECTION.md`
+
+### Trap 9: FEP dual-topology λ=0 需真实 bonded 参数
+- **症状**：FEP λ₀₀ 窗口 crash，A-state (dummy atom) 的 bonded 参数全为 0
+- **根因**：GROMACS 2026 不允许 bonds/angles/dihedrals 力常数为 0，即使 dummy atom 也不接受
+- **修复**：给 dummy atom 的 bonds/angles/dihedrals 赋予与真实原子相同的力常数
+
 ---
 
 *维护者：Claude Code*
+*最后更新：2026-05-15 下午*
 *最后更新：2026-05-14 下午*

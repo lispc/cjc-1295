@@ -1,3 +1,8 @@
+
+# ⚠️ CHIRALITY NOTE (2026-05-15):
+# "WT" trajectory = CJC-1295 (D-Ala2), "D-Ala2" trajectory = native GHRH (L-Ala)
+# See docs/CHIRALITY_CORRECTION.md
+
 #!/usr/bin/env python3
 """
 Monitor key catalytic distances during GROMACS MD trajectory.

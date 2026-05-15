@@ -1,75 +1,115 @@
 # 活跃任务跟踪
 
+*最后更新：2026-05-15 12:16*
+
+---
+
 ## 任务 1：Rosetta FlexPepDock — WT GHRH(1-29) vs DPP-IV
-**状态**：✅ 已完成（refine-only，960 models 废弃；refine 6 models 保留）
-**结论**：长肽无约束 refine 会漂移 1.6–7 Å。起始结构（来自 7CZ5 对齐）4/4 PASS，直接用于 MD。
+**状态**：✅ 已完成
+**结论**：长肽无约束 refine 会漂移。起始结构（7CZ5 对齐）4/4 PASS，直接用于 MD。
 
 ---
 
 ## 任务 2：Rosetta FlexPepDock — D-Ala2 突变体 vs DPP-IV
-**状态**：✅ 已完成（refine-only，7 models）
+**状态**：✅ 已完成
 **结论**：同 WT，无约束 refine 破坏催化几何。起始结构用于 MD。
 
 ---
 
-## 任务 3：GROMACS MD — WT 复合物（200 ns，无约束）
-**状态**：🔄 GPU 0 运行中（~55 ns / 200 ns）
-**关键发现**：P0a 分析显示 WT 有 3.58% 帧处于 2D productive pose（距离+角度同时满足）。
+## 任务 3：GROMACS MD — CJC-1295 (D-Ala2, 1-29)
+**状态**：🔄 GPU 0 运行中（**121.2 ns** / 200 ns）
+**标签**：原标为 "WT"，实际为 CJC-1295 (D-Ala2)
+**关键发现**：Ser630–Ala2O = 3.15±0.52 Å，93.8% < 4Å → 良好抑制几何
+**问题**：`md.part0002.trr` 缺失，~57ns 轨迹缺口（md.trr 9.4ns → md.part0003.trr 66.7ns）
+**下一步**：继续跑完 200 ns；缺口修复低优先级。
+
+---
+
+## 任务 4：GROMACS MD — 天然 GHRH (L-Ala, 1-29)
+**状态**：🔄 GPU 1 运行中（**40.4 ns** / 200 ns）
+**标签**：原标为 "D-Ala2"，实际为天然 GHRH (L-Ala)
+**关键发现**：Ser630–Ala2O = 6.31±1.48 Å，8.3% < 4Å → 底物/非生产性结合
+**注意**：40 ns 可能仍不足够平衡，需要 ≥100ns 再下结论
 **下一步**：继续跑完 200 ns。
 
 ---
 
-## 任务 4：GROMACS MD — D-Ala2 突变体（200 ns，无约束）
-**状态**：🔄 GPU 1 运行中（~18 ns / 200 ns）
-**关键发现**：P0a 分析显示 D-Ala2 **0.00%** 帧处于 2D productive pose。攻击角系统性偏低（77.7°）。
+## 任务 5：D-Ala2 短肽 MD (GHRH 1-10)
+**状态**：🔄 GPU 3 运行中（**139.7 ns** / 200 ns）
+**标签**：原标为 "short peptide"，实际为 D-Ala2 短肽
+**关键发现**：Glu205–Tyr1 盐桥 92.4% 稳定，催化几何 34% < 4Å
 **下一步**：继续跑完 200 ns。
 
 ---
 
-## 任务 5：WT + N 端 POSRES MD（200 ns）
-**状态**：⏹️ 已停止（GPU 2 已释放）
-**结论**：CA-only POSRES 不足以维持催化几何。约束/截断把距离锁定在 ~4.9 Å（productive zone 外）。
+## 任务 6：L-Ala 短肽 MD (GHRH 1-10) — 新增
+**状态**：⏳ 排队（自动启动监控中）
+**目的**：与 D-Ala2 短肽形成直接对照，孤立 Ala2 手性效应
+**进度**：EM ✅ → NVT ✅ → NPT ✅ → 生产 TPR ✅ → 生产 MD ⏳
+**启动条件**：FEP 全部 11 个 λ 完成后自动上 GPU 2
+**监控脚本**：`launch_LAla_when_fep_done.sh`（PID 2338670）
 
 ---
 
-## 任务 6：短肽 GHRH(1-10) 验证 MD（200 ns，无约束）
-**状态**：🔄 GPU 3 运行中（~6 ns / 200 ns）
-**关键发现**：N 端盐桥保持，但催化距离锁定在 ~4.9 Å。角度很好（83.3°）。
-**下一步**：继续跑完 200 ns。
+## 任务 7：P1-FEP (Alchemical Free Energy) — 🔄 进行中
+**状态**：批次 3 运行中（λ₀₆–λ₀₈，~48%）
+**体系**：DPP-IV + GHRH(1-10)，~100k 原子
+**方法**：GROMACS 2026 dual-topology，11 λ windows，各 5 ns
+**GPU**：GPU 2（3 窗口并发）
+**已修复**：λ₀₀ dummy atom bonded 参数 crash
+**剩余**：λ₀₆–λ₀₈ (~1.3h) → λ₀₉–λ₁₀ (~1.9h)
+**下一步**：全部完成后用 BAR/MBAR 计算 ΔG。
 
 ---
 
-## 任务 7：P0a 数据分析 ✅
+## 任务 8：手性标签审计与文档化 — ✅ 完成
 **状态**：已完成
+**发现**：所有 WT/D-Ala2 标签互换（根因：`build_DAla_mutant.py` 翻转逻辑写反）
+**行动**：
+- 创建 `docs/CHIRALITY_CORRECTION.md`
+- 创建 `workspace/step3/CHIRALITY_LABELS.txt`
+- 所有 lambda 目录和关键脚本已标注
+**决策**：不重新跑已有轨迹，通过文档澄清。
+
+---
+
+## 任务 9：催化几何初步分析 — ✅ 完成（待扩展）
+**状态**：初步结果已出，待 L-Ala 短肽和更长轨迹后完善
 **产出**：
-- WT 21.96% distance-only productive → **3.58% 2D productive**
-- D-Ala2 1.10% distance-only → **0.00% 2D productive**
-- 攻击角数据证实 D-Ala2 手性翻转同时破坏距离和角度
+- CJC-1295 (D-Ala2): 3.15±0.52 Å, 93.8% <4Å
+- 天然 GHRH (L-Ala): 6.31±1.48 Å, 8.3% <4Å
+- D-Ala2 短肽: 34% <4Å, 盐桥 92.4%
 
 ---
 
-## 任务 8：P0b Rosetta Constrained Refine 🔄
-**状态**：运行中（16 workers，各 200 models）
-**预计完成**：~40-60 分钟
-**配置**：CoordinateConstraint GHRH 1-5 CA, σ=0.5 Å, weight=10.0
+## 阻塞项 / 待决定
+
+1. **FEP 完成前 GPU 2 被占用** → L-Ala 短肽无法启动（已有自动监控）
+2. **自然 GHRH 40ns 可能不足** → 继续跑，100ns 后再评估是否需要结论修正
+3. **WT 轨迹缺口** → 低优先级，当前用 66.7–121.2ns 分析
 
 ---
 
-## 任务 9：P1-FEP 筹备 ⏳
-**状态**：准备中
-**目标**：计算 D-Ala2 vs WT 的结合自由能差 ΔΔG_bind
-**体系**：DPP-IV + GHRH(1-10) 短肽（~100k 原子）
-**方法**：GROMACS alchemical FEP（L-Ala2 ↔ D-Ala2 手性翻转）
-**难点**：手性翻转不是常规 vdW 关闭，需特殊处理 dual-topology 或 coordinate transformation
+## 待启动任务
+
+- **FEP ΔG 分析**：BAR/MBAR，计算 ΔG_bind(D-Ala2) − ΔG_bind(L-Ala)
+- **L-Ala 短肽分析**：生产 MD 完成后提取催化几何、盐桥、RMSF
+- **四系统对比分析**：CJC-1295 (1-29)、天然 GHRH (1-29)、D-Ala2 短肽、L-Ala 短肽
+- **DAC-HSA 共轭物 MD**（见下方说明）
 
 ---
 
-## 当前阻塞项
+## 附录：DAC-HSA 共轭物 MD 是什么？
 
-1. **P0b 等待中**：Rosetta refine 完成后才能分析
-2. **P1-FEP 方案未定**：需要确认 GROMACS 2026 中手性翻转 FEP 的具体实现路径
+CJC-1295 的 C 端通过一个 **马来酰亚胺丙酰基-赖氨酸（MPA-Lys）接头** 与循环血清白蛋白（HSA）的 **Cys34** 发生共价结合。这是 CJC-1295 将半衰期从几分钟延长到 6–8 天的核心机制。
+
+**DAC-HSA 共轭物 MD** 指的是模拟这个 **CJC-1295–HSA 共价复合物** 的分子动力学，研究：
+1. **接头柔性**：MPA-Lys 的长度/柔性是否允许 GHRH 的 N 端活性区域在结合 HSA 后仍能自由探索 GHRHR 受体
+2. **位阻保护**：66.5 kDa 的 HSA 是否通过立体排斥阻止其他蛋白酶接近 GHRH 肽链
+3. **构象稳定性**：共价连接后 GHRH 的二级结构（α-螺旋）是否保持
+
+**当前状态**：尚未启动。需要 HSA 结构（PDB 1E78/1AO6）+ Cys34 共价修饰参数化。属于项目后期任务。
 
 ---
 
-*最后更新：2026-05-14 晚间*
 *维护者：Claude Code*

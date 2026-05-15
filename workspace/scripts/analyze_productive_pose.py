@@ -1,3 +1,8 @@
+
+# ⚠️ CHIRALITY NOTE (2026-05-15):
+# "WT" = CJC-1295 (D-Ala2), "D-Ala2" = native GHRH (L-Ala)
+# See docs/CHIRALITY_CORRECTION.md
+
 #!/usr/bin/env python3
 """
 P0a: Analyze productive pose fraction from existing MD distance + angle data.

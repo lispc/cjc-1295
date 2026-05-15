@@ -1,3 +1,9 @@
+
+# ⚠️ CHIRALITY NOTE (2026-05-15):
+# This FEP topology was built with D-Ala2 at lambda=0 and L-Ala at lambda=1
+# (opposite of intended L→D direction). Result needs sign flip.
+# See docs/CHIRALITY_CORRECTION.md
+
 #!/usr/bin/env python3
 """
 Generate dual-topology hybrid ITP for L-Ala2 <-> D-Ala2 alchemical FEP.

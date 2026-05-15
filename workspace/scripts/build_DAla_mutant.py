@@ -1,3 +1,10 @@
+
+# ⚠️ CHIRALITY WARNING (2026-05-15):
+# This script assumes the INPUT is L-Ala and OUTPUT is D-Ala2.
+# However, the original template GHRH_1-29_from_7CZ5.pdb already had D-Ala at position 2.
+# When run on that template, the output is actually L-Ala.
+# See docs/CHIRALITY_CORRECTION.md for details.
+
 #!/usr/bin/env python3
 """
 Build GHRH(1-29) D-Ala2 mutant by inverting chirality at residue 2.

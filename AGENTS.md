@@ -31,6 +31,7 @@
 | `gmx` | `/home/scroll/miniforge3/envs/gmx` | GROMACS 2026.0 | gmx, GPU 加速 MD |
 | `cgas-md` | `/home/scroll/miniforge3/envs/cgas-md` | 已有完整 MD 工具链 | tleap, pdb4amber, AmberTools 24.8 |
 | `boltz` | `/home/scroll/miniforge3/envs/boltz` | Boltz-2 结构预测 | boltz |
+| `gmx` (OpenMM) | `/home/scroll/miniforge3/envs/gmx` | OpenMM 8.5.1 已安装 | `openmm`, `parmed` |
 
 ### 关键软件二进制
 
@@ -41,6 +42,7 @@
 | **GROMACS** | `/home/scroll/miniforge3/envs/gmx/bin/gmx` |
 | **PyMOL** | `/home/scroll/miniforge3/bin/pymol` |
 | **AmberTools tleap** | `/home/scroll/miniforge3/envs/cgas-md/bin/tleap` |
+| **OpenMM** | Python: `import openmm` (conda env `gmx`) |
 
 ### GPU 资源
 
@@ -165,6 +167,18 @@
 - **根因**：PME FFT 网格（96³）相对 compute 占比过高（PME load ~0.25），GPU 大部分时间在等 FFT
 - **对比**：325k 体系（144³ 网格）也能跑 74 ns/day——PME/PP 比例对中等体系不友好
 - **经验**：小体系不一定更快；该瓶颈无法通过调参突破
+
+### Trap 13: `make_ndx r N` 使用 PDB 残基编号而非系统索引
+- **症状**：所有催化几何分析完全错误（短肽 "3.15Å" 实际是 5.41Å）
+- **根因**：`gmx make_ndx` 的 `r N` 使用 PDB 残基编号；`-merge all` 后 GHRH 保留 chain B 编号 `r 1-29`，DPP-IV 保留 chain A 编号 `r 39-766`
+- **检测**：`gmx dump -s md.tpr | grep resind` 查看系统索引；`make_ndx` 中用 `l` 列出残基确认编号
+- **教训**：合并链拓扑中，PDB 编号和系统索引完全脱耦。必须用 `gmx dump` 确认原子映射，不能信任 `make_ndx` 的直觉
+
+### Trap 14: GROMACS → OpenMM 坐标转换时的包装问题
+- **症状**：OpenMM 能量 34.8 亿 kJ/mol，键长 16.6 nm
+- **根因**：`gmx editconf` 输出 PDB 时坐标被包装到盒子边界；OpenMM 直接读取 wrapped 坐标计算键能
+- **修复**：`gmx trjconv -pbc whole` 恢复分子完整性后再转 PDB
+- **教训**：任何跨引擎格式转换都必须做 `whole` 恢复，不能直接转 raw 轨迹
 
 ---
 

@@ -502,3 +502,81 @@
 
 *日志维护者：Claude Code*
 *最后更新：2026-05-16 上午*
+
+---
+
+## 2026-05-16 — 原子索引灾难修正 + OpenMM 复刻
+
+### 原子索引灾难（Catalytic Geometry Catastrophe）
+
+#### 问题
+所有此前的催化几何分析（Ser630-OG ↔ Ala2-C=O 距离）使用了**错误的 GHRH 原子索引**。
+
+#### 根因
+`gmx make_ndx` 的 `r N` 使用 **PDB 残基编号**，不是系统残基索引（resind）。`-merge all` 后：
+- GHRH 保留 chain B 编号：`r 1`–`r 29`
+- DPP-IV 保留 chain A 编号：`r 39`–`r 766`
+
+此前分析误用 `r 728`、`r 729`，实际选中的是 DPP-IV Val728/Asp730。
+
+#### 修正后数据
+
+| 系统 | 旧结论（错误） | 新结论（正确） |
+|------|---------------|---------------|
+| D-Ala2 短肽 | 3.15 Å, 93.8% <4Å | **5.41 Å, 3.0% <4Å** |
+| D-Ala2 全长 (0-9.4ns) | 3.31 Å, 87% <4Å | **4.82 Å, 4.2% <4Å** |
+| D-Ala2 全长 (66.7-200ns) | 4.49 Å, 43% <4Å | **4.29 Å, 39.0% <4Å** |
+| D-Ala2 全长 (100-150ns) | — | **3.96 Å, 66.0% <4Å** |
+| D-Ala2 全长 (150-200ns) | — | **4.71 Å, 0.0% <4Å** |
+
+**关键发现**：
+1. CJC-1295 (D-Ala2) **不形成稳定催化几何**
+2. 100-150 ns 有一瞬态结合窗口（3.96 Å, 66% <4Å）
+3. 150 ns 后完全脱结合（反弹到 4.71 Å）
+4. 短肽（1-10）完全失败，证实 GHRH 残基 11-29 对结合必不可少
+
+#### 文件
+- `workspace/step3/CATALYTIC_GEOMETRY_CORRECTED.md` — 完整修正报告
+- `workspace/step3/analysis_corrected.ndx` — 修正后的原子索引
+
+---
+
+### OpenMM 复刻自然 GHRH (L-Ala2, 1-29)
+
+#### 转换链路
+```
+GROMACS (DAla2_topol.top + LAla_full_frame0.gro)
+  → ParmEd → Amber prmtop (失败: virtual site bug)
+  → gmx trjconv -pbc whole → PDB
+  → Python 修复残基名 (SOL→HOH, NA→Na+, CL→Cl-)
+  → OpenMM PDBFile + ForceField('amber14-all.xml', 'amber14/tip3p.xml')
+```
+
+#### 关键挑战
+1. **Wrapped coordinates**：`gmx editconf` 输出 PDB 时坐标被包装，导致 OpenMM 键能爆炸（34.8 亿 kJ/mol）
+   - 修复：`gmx trjconv -pbc whole` 恢复分子完整性
+2. **Missing TER records**：DPP-IV (PRO 766) 与 GHRH (TYR 1) 之间缺 TER，OpenMM 误认为肽键连接
+   - 修复：手动插入 TER
+3. **Residue naming**：SOL/NA/CL 不匹配 OpenMM 力场
+   - 修复：Python 批量替换
+
+#### 速度对比（相同硬件 RTX 3090）
+
+| 引擎 | NPT 速度 | 相对 |
+|------|---------|------|
+| **OpenMM 8.5.1** | **44.4 ns/day** | 基准 |
+| GROMACS 2026.0 | ~33 ns/day | OpenMM 快 **34%** |
+
+#### 稳定性验证
+- 最小化：1000 步，PE = -5,514,030 kJ/mol
+- NVT 100 ps：195.8s，PE = -4,461,018 kJ/mol，✅ 稳定
+- NPT 100 ps：194.8s，PE = -4,477,855 kJ/mol，✅ 稳定，无 NaN
+
+#### 文件
+- `workspace/step3/openmm_production.py` — 完整生产脚本
+- `workspace/step3/OPENMM_REPLICA.md` — 技术文档
+
+---
+
+*日志维护者：Claude Code*
+*最后更新：2026-05-16 晚间*

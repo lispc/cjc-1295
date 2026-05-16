@@ -149,7 +149,27 @@
 - **根因**：GROMACS 2026 不允许 bonds/angles/dihedrals 力常数为 0，即使 dummy atom 也不接受
 - **修复**：给 dummy atom 的 bonds/angles/dihedrals 赋予与真实原子相同的力常数
 
+### Trap 10: 不能通过提取帧+新建 TPR 来改变 dt
+- **症状**：提取 checkpoint 坐标，用新 dt=0.002 建 TPR 重启 → GPU 利用率 13%，性能 9 ns/day
+- **根因**：提取的帧不含速度，系统需重新热化，且盒子/压力状态与 P-R barostat 不匹配
+- **正确做法**：用 `gmx convert-tpr` 修改已有 TPR 的 dt；或继续用 checkpoint 续跑原 dt
+- **教训**：别试图从 checkpoint 中提取帧再重启来改 dt——几乎总会变慢
+
+### Trap 11: Amber14sb + TIP3P 不能用 4 fs timestep
+- **症状**：dt=0.004 时 CUDA illegal memory access crash
+- **根因**：Amber14sb 未做 Hydrogen Mass Repartitioning (HMR)，氢原子质量太轻，4 fs 步长导致积分不稳定
+- **修复**：如要 4 fs，需先对拓扑做 HMR 处理；或在 mdp 中用 dt=0.002（安全上限）
+
+### Trap 12: 97k 原子体系在 GROMACS 2026 + RTX 3090 上性能上限约 70 ns/day
+- **观察**：短肽体系（97k 原子）无论如何调参数，性能上限 ~60-70 ns/day
+- **根因**：PME FFT 网格（96³）相对 compute 占比过高（PME load ~0.25），GPU 大部分时间在等 FFT
+- **对比**：325k 体系（144³ 网格）也能跑 74 ns/day——PME/PP 比例对中等体系不友好
+- **经验**：小体系不一定更快；该瓶颈无法通过调参突破
+
 ---
+
+*维护者：Claude Code*
+*最后更新：2026-05-16 上午*
 
 *维护者：Claude Code*
 *最后更新：2026-05-15 下午*

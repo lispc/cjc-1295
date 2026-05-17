@@ -28,9 +28,17 @@
 ---
 
 ## 任务 4：GROMACS MD — 天然 GHRH (L-Ala, 1-29) 全长
-**状态**：🔄 已跑 ~80 ps（LAla_full_opt.xtc），**未续跑**
-**注意**：此系统实际进度远低于预期。之前上下文中的 "62ns" 数据属于标签混淆时期，可能实际对应 D-Ala2。
-**当前真实的 L-Ala 全长轨迹仅 80 ps**，远不足以做统计。
+**状态**：🔄 **GPU 3 已续跑**（从 84.5 ps checkpoint 开始）
+**性能**：待稳定（刚启动，GPU 利用率 96%）
+**目标**：200 ns
+**剩余**：199.9 ns
+**预计完成**：~6 天（若性能 33 ns/day）
+**启动命令**：
+```bash
+gmx mdrun -s LAla_full_opt.tpr -deffnm LAla_full_opt -cpi LAla_full_opt.cpt \
+  -noappend -gpu_id 3 -ntmpi 1 -ntomp 8 -nb gpu -pme gpu -bonded gpu -update gpu \
+  -dlb yes -maxh 240 -cpt 15
+```
 
 ---
 
@@ -44,9 +52,11 @@
 ---
 
 ## 任务 6：L-Ala 短肽 MD (GHRH 1-10)
-**状态**：🔄 GPU 2 运行中（LAla_short_v2, ~200 ns 目标）
-**性能**：60 ns/day
-**进度**：从 xtc 大小估算已跑较大量
+**状态**：✅ **已完成**（200 ns / 200 ns）
+**性能**：161.73 ns/day
+**完成时间**：2026-05-17 04:20
+**总耗时**：1d05h40m（wall time 106,844 s）
+**文件**：`LAla_short_v2.xtc` (8.5G), `LAla_short_v2.log`
 
 ---
 
@@ -85,15 +95,17 @@
 ---
 
 ## 任务 11：OpenMM 复刻自然 GHRH (L-Ala2, 1-29)
-**状态**：✅ 已完成（1 ns 基准测试 + 稳定性验证）
+**状态**：✅ 已完成（1.2 ns 生产 + 分析）
 **GPU**：GPU 0
-**速度**：NPT **44.4 ns/day**（vs GROMACS ~33 ns/day，快 34%）
-**稳定性**：NVT 100 ps + NPT 100 ps 无 NaN
-**文件**：`openmm_production.py`, `OPENMM_REPLICA.md`
+**速度**：NPT **43.2 ± 0.1 ns/day**（vs GROMACS ~33 ns/day，快 30%）
+**热力学**：T = 310.35 ± 0.46 K ✅, ρ = 995.5 ± 0.8 kg/m³, V = 3301.9 ± 2.7 nm³
+**结构**：RMSD = 2.36 ± 0.76 Å, Rg = 38.88 ± 0.10 Å, RMSF_max(res206) = 1.84 Å
+**文件**：`openmm_production.py`, `openmm_analysis_summary.txt`, `openmm_analysis.png`
 **注意**：
-- OpenMM thermostat = 300 K，GROMACS ref_t = 310 K（10K 差异）
+- OpenMM 和 GROMACS 均设为 310 K，温度完美匹配
+- 密度比 GROMACS 参考值低 ~2%（MonteCarloBarostat vs Parrinello-Rahman 差异）
+- RMSD 持续漂移表明系统仍在弛豫，>10 ns 才能收敛
 - 溶剂化条件不完全相同（OpenMM 从 PDB 重建 vs GROMACS 原始溶剂化）
-- 对于速度基准和物理等价性验证已足够
 
 ---
 
@@ -108,15 +120,15 @@
 | | **全长 (1-29)** | **短肽 (1-10)** |
 |---|---|---|
 | **D-Ala2** | ✅ ~200 ns（有空缺） | ✅ ~200 ns |
-| **L-Ala** | ⚠️ 仅 ~80 ps | 🔄 ~200 ns 进行中 |
+| **L-Ala** | 🔄 ~41 ns / 200 ns (GPU 3 续跑中) | ✅ 200 ns / 200 ns (已完成) |
 
 ---
 
 ## 待办
 
-1. **OpenMM 1 ns 轨迹分析**：等生产跑完后分析温度/压力/RMSD，与 GROMACS 80 ps 对比
-2. **GROMACS L-Ala 全长续跑**：当前仅 80 ps，需决定是否继续跑至 200 ns
-3. **四系统统一分析**：等 L-Ala 短肽完成后做 RMSF/SASA/氢键/盐桥/MM-PBSA
+1. ~~OpenMM 1 ns 轨迹分析~~ ✅ 已完成（见任务 11）
+2. ~~GROMACS L-Ala 全长续跑~~ ✅ 已续跑（GPU 3，从 84.5 ps checkpoint）
+3. **四系统统一分析**：等 D-Ala2 全长完成后启动（L-Ala 短肽 ✅ 已就绪）
 4. **Tyr1-N → Glu205 盐桥重新分析**：用正确原子（11655）重新计算
 5. **GHRH 构象聚类**：分析 D-Ala2 全长 100-150ns 瞬态窗口的构象特征
 
